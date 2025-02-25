@@ -1,0 +1,21 @@
+<volume type='file'>
+  <name>{{ item.vm_hostname }}-vda.img</name>
+  <key>/var/lib/libvirt/images/{{ item.vm_hostname }}-vda.img</key>
+  <allocation unit="GB">30</allocation>
+  <capacity unit="GB">30</capacity>
+  <target>
+    <path>/var/lib/libvirt/images/{{ item.vm_hostname }}-vda.img</path>
+    <format type='raw'/>
+    <permissions>
+      <owner>107</owner>
+      <group>107</group>
+      <mode>0744</mode>
+      <label>virt_image_t</label>
+    </permissions>
+    <compat>1.1</compat>
+    <clusterSize unit='KiB'>64</clusterSize>
+    <features>
+      <lazy_refcounts/>
+    </features>
+  </target>
+</volume>

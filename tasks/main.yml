@@ -1,0 +1,88 @@
+---
+
+- name: install pkgs
+  ansible.builtin.apt:
+    name: "{{ packages }}"
+    state: present
+  vars:
+    packages:
+      - libvirt-daemon-system
+      - python3-libvirt
+      - python3-lxml
+
+- name: Enable default network
+  community.libvirt.virt_net:
+    name: "default"
+    state: active
+
+- name: Define storage pools
+  community.libvirt.virt_pool:
+    name: "virtimages"
+    command: define
+    autostart: no
+    xml: "{{ lookup('template', 'storagepool.xml.j2') }}"
+
+- name: Start storage pool
+  community.libvirt.virt_pool:
+    command: list_pools
+    name: virtimages
+  register: storage_pools
+
+- name: Start storage pool
+  community.libvirt.virt_pool:
+    command: create
+    name: virtimages
+  when: not "virtimages" in storage_pools.list_pools
+
+#- name: Test for local ISO
+#  ansible.builtin.stat:
+#    name: "/tmp/{{ kvm.download_url | urlsplit('path') | split('/') | last }}"
+#  register: local_iso
+
+#- name: Download ISO
+#  ansible.builtin.get_url:
+#    url: "{{ kvm.download_url }}"
+#    checksum: "{{ kvm.checksum_type }}:{{ kvm.checksum }}"
+#    dest: "/tmp"
+#    mode: 0644
+#  register: downloaded_iso
+#  when: local_iso.stat.exists == False
+
+- name: Define VMs
+  community.libvirt.virt:
+    autostart: no
+    command: define
+    xml: "{{ lookup('template', 'kvm-template.xml.j2') }}"
+  loop: "{{ vms }}"
+
+- name: Write storage volume xmls
+  ansible.builtin.template:
+    src: "storage-volume.xml.j2"
+    dest: "/tmp/storage-volume-{{ item.vm_hostname }}.xml"
+  loop: "{{ vms }}"
+
+- name: List volumes
+  ansible.builtin.command: virsh vol-list virtimages
+  register: listed_volumes
+
+#- debug:
+#    msg: "{{ listed_volumes }}"
+
+- name: Create volumes
+  ansible.builtin.command: virsh vol-create virtimages /tmp/storage-volume-{{ item.vm_hostname }}.xml
+  loop: "{{ vms }}"
+  when: not "{{ item.vm_hostname }}-vda.img" in listed_volumes.stdout
+
+- name: Delete storage volume xmls
+  ansible.builtin.file:
+    path: "/tmp/storage-volume-{{ item.vm_hostname }}.xml"
+    state: absent
+  loop: "{{ vms }}"
+
+#- name: Start VMs
+#  community.libvirt.virt:
+#    name: "{{ item.vm_hostname }}"
+#    state: running
+#  loop: "{{ vms }}"
+
+
